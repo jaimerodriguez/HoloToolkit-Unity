@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -123,6 +124,8 @@ namespace HoloToolkit.Unity
         {
             // Get the raycast hit information from Unity's physics system.
             RaycastHit hitInfo;
+            bool isUIHitTest = false;
+            Nullable<RaycastResult> uiHitInfo = null ;   
 
             if (GazeStabilization != null)
             {
@@ -132,6 +135,8 @@ namespace HoloToolkit.Unity
             {
                 Hit = Physics.Raycast(gazeOrigin, gazeDirection, out hitInfo, MaxGazeDistance, RaycastLayerMask);
             }
+
+           
 
             if (!Hit && HitTestUI && (UIRoot != null))
             {
@@ -153,19 +158,21 @@ namespace HoloToolkit.Unity
                             var ui = result.gameObject.GetComponent<UIBehaviour>();
                             if (ui != null)
                             {
+                                Hit = true;
+                                isUIHitTest = true;
+                                uiHitInfo = result;                         
                                 hitInfo.point = gazeOrigin + result.distance * gazeDirection;
                                 hitInfo.normal = result.gameObject.transform.forward;
-                                lastHitDistance = result.distance;
-                                FocusedObject = result.gameObject;
+                                lastHitDistance = result.distance;                                                                                         
                                 break;
                             }
                         }
                     }
                 }
-            }
+            } 
 
-            GameObject oldFocusedObject = FocusedObject;
-
+            
+             GameObject oldFocusedObject = FocusedObject; 
             // Update the HitInfo property so other classes can use this hit information.
             HitInfo = hitInfo;
 
@@ -175,7 +182,10 @@ namespace HoloToolkit.Unity
                 Position = hitInfo.point;
                 Normal = hitInfo.normal;
                 lastHitDistance = hitInfo.distance;
-                FocusedObject = hitInfo.collider.gameObject;
+                if (!isUIHitTest)
+                    FocusedObject  = hitInfo.collider.gameObject;
+                else 
+                    FocusedObject = uiHitInfo.Value.gameObject;                
             }
             else
             {
