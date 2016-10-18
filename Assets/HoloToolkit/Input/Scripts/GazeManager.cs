@@ -1,7 +1,9 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace HoloToolkit.Unity
 {
@@ -47,6 +49,13 @@ namespace HoloToolkit.Unity
         /// </summary>
         [Tooltip("Use built in gaze stabilization that utilizes gavity wells.")]
         public bool UseBuiltInGazeStabilization = true;
+
+
+        [Tooltip("Hit Test User Interface.")]
+        public bool HitTestUI = false;
+
+        [Tooltip("Root Canvas for UI Hit testing")]
+        public Canvas UIRoot;
 
         /// <summary>
         /// Physics.Raycast result is true if it hits a hologram.
@@ -124,6 +133,37 @@ namespace HoloToolkit.Unity
                 Hit = Physics.Raycast(gazeOrigin, gazeDirection, out hitInfo, MaxGazeDistance, RaycastLayerMask);
             }
 
+            if (!Hit && HitTestUI && (UIRoot != null))
+            {
+                var rayCaster = UIRoot.gameObject.GetComponent<UnityEngine.UI.GraphicRaycaster>();
+                if (rayCaster != null)
+                {
+                    var results = new List<UnityEngine.EventSystems.RaycastResult>();
+                    var pointerEventData = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current);
+                    var holoInputModule = UnityEngine.EventSystems.EventSystem.current.GetComponent<HoloLensInputModule>();
+                    pointerEventData.position = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                    pointerEventData.delta = Vector2.zero;
+                    pointerEventData.scrollDelta = Vector2.zero;
+
+                    rayCaster.Raycast(pointerEventData, results);
+                    if (results.Count > 0)
+                    {
+                        foreach (var result in results)
+                        {
+                            var ui = result.gameObject.GetComponent<UIBehaviour>();
+                            if (ui != null)
+                            {
+                                hitInfo.point = gazeOrigin + result.distance * gazeDirection;
+                                hitInfo.normal = result.gameObject.transform.forward;
+                                lastHitDistance = result.distance;
+                                FocusedObject = result.gameObject;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
             GameObject oldFocusedObject = FocusedObject;
 
             // Update the HitInfo property so other classes can use this hit information.
@@ -152,6 +192,12 @@ namespace HoloToolkit.Unity
                 if (oldFocusedObject != null)
                 {
                     oldFocusedObject.SendMessage("OnGazeLeave", SendMessageOptions.DontRequireReceiver);
+                    if (HitTestUI)
+                    {                         
+                        EventSystem.current.SetSelectedGameObject(null);
+                        if (FocusedObject != null)
+                            EventSystem.current.SetSelectedGameObject(FocusedObject);                         
+                    }
                 }
                 if (FocusedObject != null)
                 {
